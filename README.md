@@ -1,6 +1,7 @@
 # Omni Prism
 
 A free, cross-platform, open-source image viewer
+Download: https://github.com/nexina/omni-prism/releases
 
 ## Getting Started
 
