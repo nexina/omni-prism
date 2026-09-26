@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'dart:async';
 
-import 'package:file_picker/file_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:omni_prism/imageviewer_frame.dart';
 import 'package:window_manager/window_manager.dart';
@@ -15,7 +14,7 @@ import 'package:omni_prism/imageviewer_component.dart';
 String imagePath = "";
 String folderPath = "";
 String projectUrl = "https://github.com/nexina/omni-prism";
-String facebookUrl = "https://www.facebook.com/nexina.corp/";
+String facebookUrl = "https://www.facebook.com/nexina.fb/";
 String omniUrl = "https://nexina.github.io/omni";
 
 // This is the main function
