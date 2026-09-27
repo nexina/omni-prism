@@ -1,13 +1,18 @@
 import 'package:get_it/get_it.dart';
-import 'package:omni_preview/features/main/data/datasource/local/recent_list_local_datasource.dart';
-import 'package:omni_preview/features/main/data/repositories/recent_list_repository_impl.dart';
-import 'package:omni_preview/features/main/domain/repositories/recent_list_repository.dart';
-import 'package:omni_preview/features/main/domain/usecase/recent_list.dart';
-import 'package:omni_preview/features/main/presentation/bloc/recent_list_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:omni_prism/features/image_viewer/data/datasources/local/image_local_datasource.dart';
+import 'package:omni_prism/features/image_viewer/data/repositories/image_repository.dart';
+import 'package:omni_prism/features/image_viewer/domain/usecases/get_images_in_folder.dart';
+import 'package:omni_prism/features/image_viewer/domain/usecases/delete_image.dart';
+import 'package:omni_prism/features/image_viewer/domain/usecases/share_image.dart';
+import 'package:omni_prism/features/image_viewer/domain/usecases/set_wallpaper.dart';
+import 'package:omni_prism/features/image_viewer/presentation/bloc/image_viewer_bloc.dart';
+import 'package:omni_prism/features/about/presentation/bloc/about_bloc.dart';
 
+/// Dependency injection container using GetIt
 final getIt = GetIt.instance;
 
+/// Initialize all dependencies
 Future<void> init() async {
   /// ----------------------------------------------------------
   /// External
@@ -16,39 +21,53 @@ Future<void> init() async {
   getIt.registerLazySingleton<SharedPreferences>(() => sharedPreferences);
 
   /// ----------------------------------------------------------
-  /// Data sources
+  /// Feature: Image Viewer
   /// ----------------------------------------------------------
-  getIt.registerLazySingleton<RecentListLocalDataSource>(
-    () => RecentListLocalDataSourceImpl(prefs: getIt()),
+  // Data Sources
+  getIt.registerLazySingleton<ImageLocalDataSource>(
+    () => ImageLocalDataSourceImpl(),
   );
 
-  /// ----------------------------------------------------------
-  /// Repositories
-  /// ----------------------------------------------------------
-  getIt.registerLazySingleton<RecentListRepository>(
-    () => RecentListRepositoryImpl(localDataSource: getIt()),
+  // Repositories
+  getIt.registerLazySingleton<ImageRepository>(
+    () => ImageRepositoryImpl(localDataSource: getIt()),
   );
 
-  /// ----------------------------------------------------------
-  /// Use cases
-  /// ----------------------------------------------------------
-  getIt.registerLazySingleton(() => GetRecentList(getIt()));
+  // Use Cases
+  getIt.registerLazySingleton(() => GetImagesInFolderUseCase(getIt()));
+  getIt.registerLazySingleton(() => DeleteImageUseCase(getIt()));
+  getIt.registerLazySingleton(() => ShareImageUseCase());
+  getIt.registerLazySingleton(() => SetWallpaperUseCase());
 
-  getIt.registerLazySingleton(() => AddFileInRecent(getIt()));
-
-  getIt.registerLazySingleton(() => RemoveFileFromRecentList(getIt()));
-
-  getIt.registerLazySingleton(() => ClearRecentList(getIt()));
+  // BLoC
+  getIt.registerFactory(() => ImageViewerBloc(
+    getImagesInFolder: getIt(),
+    deleteImage: getIt(),
+    shareImage: getIt(),
+    setWallpaper: getIt(),
+  ));
 
   /// ----------------------------------------------------------
-  /// BLoC
+  /// Feature: About
   /// ----------------------------------------------------------
-  getIt.registerFactory(
-    () => RecentListBloc(
-      getRecentFiles: getIt(),
-      addRecentFile: getIt(),
-      removeRecentFile: getIt(),
-      clearRecentFiles: getIt(),
-    ),
-  );
+  getIt.registerFactory(() => AboutBloc());
+
+  /// ----------------------------------------------------------
+  /// Feature: Gallery (TODO: implement)
+  /// ----------------------------------------------------------
+  // getIt.registerLazySingleton<GalleryLocalDataSource>(
+  //   () => GalleryLocalDataSourceImpl(),
+  // );
+  // getIt.registerLazySingleton<GalleryRepository>(
+  //   () => GalleryRepositoryImpl(localDataSource: getIt()),
+  // );
+  // getIt.registerFactory(() => GalleryBloc(
+  //   pickFolder: getIt(),
+  //   loadFolder: getIt(),
+  // ));
+}
+
+/// Reset all registrations (useful for testing)
+Future<void> reset() async {
+  await getIt.reset();
 }
