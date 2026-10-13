@@ -1,120 +1,113 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter/gestures.dart';
-import 'package:url_launcher/url_launcher_string.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:omni_prism/core/config/constants.dart';
-import 'package:omni_prism/core/config/theme.dart';
-import 'package:omni_prism/features/about/presentation/bloc/about_bloc.dart';
+import 'package:omni_prism/core/widgets/background_builder.dart';
 
 /// About page
 class AboutPage extends StatelessWidget {
   const AboutPage({super.key});
 
+  static Future<void> _open(String url) async {
+    await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+  }
+
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (context) => AboutBloc(),
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('About'),
-          backgroundColor: AppTheme.topBarBackground,
-        ),
-        body: Container(
-          color: AppTheme.backgroundColor,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+    return BackgroundBuilder(
+      child: Column(
+        children: [
+          Row(
             children: [
-              Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Image.asset(
-                    AppConstants.appIconPath,
-                    width: AppConstants.aboutIconSize,
-                    fit: BoxFit.fitHeight,
-                    errorBuilder: (context, error, stackTrace) {
-                      return const Icon(Icons.image, size: 100, color: Colors.white);
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Omni Prism',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Version 1.0.1',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey,
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(
-                width: 400,
-                child: RichText(
-                  text: TextSpan(
-                    style: const TextStyle(
-                      color: Colors.white,
-                    ),
-                    children: <TextSpan>[
-                      const TextSpan(
-                        text:
-                            'Omni Prism is an open-source image viewer application. '
-                            'For licensing information, visit ',
-                      ),
-                      TextSpan(
-                        text: 'https://creativecommons.org/licenses/by-nc/4.0/',
-                        style: const TextStyle(color: Colors.blue, decoration: TextDecoration.underline),
-                        recognizer: TapGestureRecognizer()
-                          ..onTap = () async {
-                            if (await canLaunchUrlString(
-                                'https://creativecommons.org/licenses/by-nc/4.0/')) {
-                              await launchUrlString(
-                                  'https://creativecommons.org/licenses/by-nc/4.0/');
-                            } else {
-                              await launchUrlString(AppConstants.projectUrl);
-                            }
-                          },
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  IconButton(
-                    onPressed: () async {
-                      if (await canLaunchUrlString(AppConstants.projectUrl)) {
-                        await launchUrlString(AppConstants.projectUrl);
-                      }
-                    },
-                    icon: const Icon(
-                      Icons.public,
-                      color: Colors.white,
-                    ),
-                    tooltip: 'Project Website',
-                  ),
-                  IconButton(
-                    onPressed: () async {
-                      if (await canLaunchUrlString(AppConstants.facebookUrl)) {
-                        await launchUrlString(AppConstants.facebookUrl);
-                      }
-                    },
-                    icon: const Icon(
-                      Icons.facebook,
-                      color: Colors.white,
-                    ),
-                    tooltip: 'Facebook',
-                  ),
-                ],
+              IconButton(
+                tooltip: 'Back',
+                onPressed: () => Navigator.of(context).maybePop(),
+                icon: const Icon(Icons.arrow_back, color: Colors.white),
               ),
             ],
+          ),
+          SizedBox(
+            height: 220,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Image.asset(
+                  AppConstants.appIconPath,
+                  width: 80,
+                  height: 80,
+                  errorBuilder: (context, error, stackTrace) =>
+                      const Icon(Icons.image, size: 80, color: Colors.white),
+                ),
+                const SizedBox(height: 14),
+                const Text(
+                  AppConstants.appName,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontFamily: AppConstants.fontFamily,
+                    fontSize: 30,
+                  ),
+                ),
+                const Padding(
+                  padding: EdgeInsets.all(8.0),
+                  child: Text(
+                    'Version ${AppConstants.appVersion}',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontFamily: AppConstants.fontFamily,
+                      fontSize: 10,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: Container(
+              width: double.infinity,
+              color: Colors.black.withValues(alpha: 0.5),
+              child: ListView(
+                children: [
+                  _ListItem(
+                    title: 'Visit Website',
+                    onPressed: () => _open(AppConstants.omniUrl),
+                  ),
+                  _ListItem(
+                    title: 'Source Code',
+                    onPressed: () => _open(AppConstants.projectUrl),
+                  ),
+                  _ListItem(
+                    title: 'Facebook',
+                    onPressed: () => _open(AppConstants.facebookUrl),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ListItem extends StatelessWidget {
+  final String title;
+  final VoidCallback? onPressed;
+
+  const _ListItem({required this.title, this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 50,
+      decoration: const BoxDecoration(
+        border: Border(bottom: BorderSide(color: Colors.white70, width: 1)),
+      ),
+      child: TextButton(
+        onPressed: onPressed,
+        child: Text(
+          title,
+          style: const TextStyle(
+            color: Colors.white,
+            fontFamily: AppConstants.fontFamily,
           ),
         ),
       ),

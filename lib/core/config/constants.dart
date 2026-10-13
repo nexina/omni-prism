@@ -83,6 +83,14 @@ class AppConstants {
   ];
 
   // Asset paths
-  static const String appIconPath = 'images/omni_prism_ic.png';
+  static const String appIconPath = 'assets/icons/omni_prism_ic.png';
+  static const String companyIconPath = 'assets/icons/nexina_white.png';
   static const String defaultBackgroundPath = 'assets/images/default.jpg';
+
+  // Fonts
+  static const String fontFamily = 'Inria Sans';
+
+  // App info
+  static const String appName = 'Omni Prism';
+  static const String appVersion = '1.0.1';
 }

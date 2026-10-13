@@ -1,13 +1,20 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:window_manager/window_manager.dart';
 import 'package:omni_prism/core/class/working_file.dart';
 import 'package:omni_prism/core/config/constants.dart';
 import 'package:omni_prism/core/config/theme.dart';
+import 'package:omni_prism/core/utils/format_utils.dart';
+import 'package:omni_prism/core/utils/path_utils.dart';
+import 'package:omni_prism/core/widgets/index.dart';
+import 'package:omni_prism/features/image_viewer/data/models/image_item.dart';
 import 'package:omni_prism/features/image_viewer/presentation/bloc/image_viewer_bloc.dart';
 import 'package:omni_prism/features/image_viewer/presentation/bloc/image_viewer_event.dart';
 import 'package:omni_prism/features/image_viewer/presentation/bloc/image_viewer_state.dart';
 import 'package:omni_prism/features/image_viewer/presentation/widgets/index.dart';
-import 'package:omni_prism/features/about/presentation/pages/about_page.dart';
 
 /// Main image viewer page
 class ImageViewerPage extends StatefulWidget {
@@ -22,172 +29,252 @@ class ImageViewerPage extends StatefulWidget {
   State<ImageViewerPage> createState() => _ImageViewerPageState();
 }
 
-class _ImageViewerPageState extends State<ImageViewerPage>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _animationController;
-  late Animation<double> _fadeAnimation;
-  late ScrollController _scrollController;
+class _ImageViewerPageState extends State<ImageViewerPage> {
+  PageController? _pageController;
+  bool _isZoomed = false;
+  bool _isWindowFullScreen = false;
+
+  static bool get _isDesktop =>
+      Platform.isWindows || Platform.isLinux || Platform.isMacOS;
+
+  // share_plus cannot share files on Linux
+  static bool get _canShare => !Platform.isLinux;
 
   @override
   void initState() {
     super.initState();
-    _animationController = AnimationController(
-      duration: const Duration(milliseconds: AppConstants.fadeAnimationDuration),
-      vsync: this,
-    );
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(_animationController);
-    _scrollController = ScrollController();
-
-    _animationController.forward();
-
-    // Load images from the folder
-    final folderPath = _getFolderPath(widget.workingFile.workingPath);
+    final path = widget.workingFile.workingPath;
     context.read<ImageViewerBloc>().add(
-          LoadImages(folderPath: folderPath, initialIndex: 0),
+          LoadImages(
+            folderPath: PathUtils.getDirectoryPath(path),
+            initialPath: path,
+          ),
         );
   }
 
   @override
   void dispose() {
-    _animationController.dispose();
-    _scrollController.dispose();
+    _pageController?.dispose();
+    if (_isWindowFullScreen) _setWindowFullScreen(false);
     super.dispose();
   }
 
-  /// Extracts folder path from a file path
-  String _getFolderPath(String filePath) {
-    final normalizedPath = filePath.replaceAll('\\', '/');
-    final parts = normalizedPath.split('/');
-    if (parts.length <= 1) return '';
-    return parts.sublist(0, parts.length - 1).join('/');
+  Future<void> _setWindowFullScreen(bool value) async {
+    if (!_isDesktop) return;
+    _isWindowFullScreen = value;
+    try {
+      await windowManager.setFullScreen(value);
+    } catch (_) {
+      // Window manager may be unavailable (e.g. in tests)
+    }
+  }
+
+  /// Keeps the PageView in step with the bloc's current index
+  void _syncPage(int index) {
+    final controller = _pageController;
+    if (controller == null || !controller.hasClients) return;
+    final page = controller.page?.round() ?? controller.initialPage;
+    if (page == index) return;
+    if ((page - index).abs() == 1) {
+      controller.animateToPage(
+        index,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeInOut,
+      );
+    } else {
+      controller.jumpToPage(index);
+    }
+  }
+
+  void _onStateChanged(BuildContext context, ImageViewerState state) {
+    _syncPage(state.currentIndex);
   }
 
   @override
   Widget build(BuildContext context) {
-    return BlocListener<ImageViewerBloc, ImageViewerState>(
-      listener: (context, state) {
-        // Handle any side effects
-      },
-      child: Scaffold(
-        backgroundColor: AppTheme.backgroundColor,
-        body: BlocBuilder<ImageViewerBloc, ImageViewerState>(
-          builder: (context, state) {
-            if (state.status == ImageViewerStatus.loading) {
-              return const Center(
-                child: CircularProgressIndicator(),
-              );
-            }
-
-            if (state.status == ImageViewerStatus.empty) {
-              return _buildEmptyState();
-            }
-
-            if (state.status == ImageViewerStatus.error) {
-              return Center(
-                child: Text(
-                  'Error: ${state.error}',
-                  style: const TextStyle(color: Colors.red),
-                ),
-              );
-            }
-
-            if (state.status != ImageViewerStatus.loaded ||
-                state.currentImage == null) {
-              return const SizedBox.shrink();
-            }
-
-            return Stack(
-              children: [
-                // Main image component
-                ImageComponent(
-                  imageList: state.images,
-                  initialIndex: state.currentIndex,
-                  onImageChanged: (image) {
-                    // Image changed - could update something here
-                  },
-                  onNextImage: () {
-                    context.read<ImageViewerBloc>().add(const NavigateNext());
-                  },
-                  onPrevImage: () {
-                    context.read<ImageViewerBloc>().add(const NavigatePrev());
-                  },
-                  onDoubleTap: () {
-                    context.read<ImageViewerBloc>().add(const ToggleFullscreen());
-                  },
-                ),
-                // Top bar
-                TopBar(
-                  controller: _animationController,
-                  animation: _fadeAnimation,
-                  imageTitle: state.currentImage!.title,
-                  imageCreationTime: state.currentImage!.creationTime,
-                  currentImagePath: state.currentImage!.path,
-                  isVisible: state.isVisible,
-                  isFullscreen: state.isFullscreen,
-                  onVisibilityToggle: () {
-                    context.read<ImageViewerBloc>().add(const ToggleVisibility());
-                  },
-                  onFullscreenToggle: () {
-                    context.read<ImageViewerBloc>().add(const ToggleFullscreen());
-                  },
-                  onDelete: () => _showDeleteDialog(context),
-                  onShare: () {
-                    context.read<ImageViewerBloc>().add(const ShareCurrent());
-                  },
-                  onAbout: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const AboutPage()),
-                    );
-                  },
-                ),
-                // Bottom bar
-                BottomBar(
-                  controller: _animationController,
-                  animation: _fadeAnimation,
-                  projectName: 'Project Omni',
-                  imagePaths: state.images.map((e) => e.path).toList(),
-                  currentIndex: state.currentIndex,
-                  scrollController: _scrollController,
-                  onImageTap: (index) {
-                    context.read<ImageViewerBloc>().add(GoToIndex(index));
-                  },
-                ),
-              ],
-            );
+    return MultiBlocListener(
+      listeners: [
+        BlocListener<ImageViewerBloc, ImageViewerState>(
+          listenWhen: (prev, curr) =>
+              prev.currentIndex != curr.currentIndex ||
+              prev.images.length != curr.images.length,
+          listener: _onStateChanged,
+        ),
+        BlocListener<ImageViewerBloc, ImageViewerState>(
+          listenWhen: (prev, curr) => prev.isFullscreen != curr.isFullscreen,
+          listener: (context, state) => _setWindowFullScreen(state.isFullscreen),
+        ),
+        BlocListener<ImageViewerBloc, ImageViewerState>(
+          listenWhen: (prev, curr) =>
+              curr.error != null &&
+              prev.error != curr.error &&
+              curr.status == ImageViewerStatus.loaded,
+          listener: (context, state) {
+            ScaffoldMessenger.of(context)
+              ..hideCurrentSnackBar()
+              ..showSnackBar(SnackBar(content: Text(state.error!)));
           },
         ),
+      ],
+      child: BlocBuilder<ImageViewerBloc, ImageViewerState>(
+        builder: (context, state) {
+          switch (state.status) {
+            case ImageViewerStatus.initial:
+            case ImageViewerStatus.loading:
+              return const BackgroundBuilder(
+                child: Center(
+                  child: CircularProgressIndicator(color: Colors.white),
+                ),
+              );
+            case ImageViewerStatus.empty:
+              return _buildMessage(
+                icon: Icons.image_not_supported_outlined,
+                message: 'No images left in this folder',
+              );
+            case ImageViewerStatus.error:
+              return _buildMessage(
+                icon: Icons.error_outline,
+                message: 'Error: ${state.error}',
+              );
+            case ImageViewerStatus.loaded:
+              if (state.currentImage == null) {
+                return _buildMessage(
+                  icon: Icons.image_not_supported_outlined,
+                  message: 'Nothing to show',
+                );
+              }
+              return _buildViewer(context, state);
+          }
+        },
       ),
     );
   }
 
-  Widget _buildEmptyState() {
-    return Center(
-      child: Container(
-        width: 300,
-        height: 300,
-        decoration: AppTheme.emptyStateDecoration,
-        child: TextButton(
-          onPressed: () async {
-            // TODO: Implement file picker
-          },
+  Widget _buildMessage({required IconData icon, required String message}) {
+    return BackgroundBuilder(
+      child: Column(
+        children: [
+          ViewerAppBar(title: PathUtils.getFileName(widget.workingFile.path)),
+          Expanded(
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(icon, size: 64, color: Colors.white54),
+                  const SizedBox(height: 16),
+                  Text(
+                    message,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.white, fontSize: 16),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const OmniFooter(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildViewer(BuildContext context, ImageViewerState state) {
+    final bloc = context.read<ImageViewerBloc>();
+    final image = state.currentImage!;
+    final showChrome = state.isVisible && !state.isFullscreen;
+    _pageController ??= PageController(initialPage: state.currentIndex);
+
+    final details = <String>[
+      '${state.displayIndex} / ${state.totalImages}',
+      if (image.creationTime.isNotEmpty) image.creationTime,
+      if (image.size != null) FormatUtils.formatBytes(image.size!),
+    ].join('  ·  ');
+
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.arrowRight): () =>
+            bloc.add(const NavigateNext()),
+        const SingleActivator(LogicalKeyboardKey.arrowLeft): () =>
+            bloc.add(const NavigatePrev()),
+        const SingleActivator(LogicalKeyboardKey.delete): () =>
+            _showDeleteDialog(context),
+        const SingleActivator(LogicalKeyboardKey.keyF): () =>
+            bloc.add(const ToggleFullscreen()),
+        const SingleActivator(LogicalKeyboardKey.f11): () =>
+            bloc.add(const ToggleFullscreen()),
+        const SingleActivator(LogicalKeyboardKey.keyI): () =>
+            _showInfoDialog(context, image),
+        const SingleActivator(LogicalKeyboardKey.escape): () {
+          if (state.isFullscreen) {
+            bloc.add(const ToggleFullscreen());
+          } else {
+            Navigator.of(context).maybePop();
+          }
+        },
+      },
+      child: Focus(
+        autofocus: true,
+        child: BackgroundBuilder(
+          overlayOpacity: showChrome ? 0.5 : 0.85,
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Padding(
-                padding: EdgeInsets.all(AppConstants.paddingXLarge),
-                child: Image.asset(
-                  AppConstants.appIconPath,
-                  height: 50,
-                  errorBuilder: (context, error, stackTrace) {
-                    return const Icon(Icons.image, size: 50, color: Colors.white);
-                  },
+              if (showChrome)
+                ViewerAppBar(
+                  title: image.title,
+                  desc: details,
+                  actions: _buildActions(context, state),
+                ),
+              Expanded(
+                child: Stack(
+                  children: [
+                    PageView.builder(
+                      controller: _pageController,
+                      physics: _isZoomed
+                          ? const NeverScrollableScrollPhysics()
+                          : const PageScrollPhysics(),
+                      itemCount: state.images.length,
+                      onPageChanged: (index) {
+                        if (index != bloc.state.currentIndex) {
+                          bloc.add(GoToIndex(index));
+                        }
+                      },
+                      itemBuilder: (context, index) {
+                        final item = state.images[index];
+                        return ZoomableImage(
+                          key: ValueKey(item.path),
+                          imagePath: item.path,
+                          onTap: () => bloc.add(const ToggleVisibility()),
+                          onZoomChanged: (zoomed) {
+                            if (zoomed != _isZoomed) {
+                              setState(() => _isZoomed = zoomed);
+                            }
+                          },
+                        );
+                      },
+                    ),
+                    if (state.hasPrev)
+                      _NavigationButton(
+                        icon: Icons.chevron_left,
+                        alignment: Alignment.centerLeft,
+                        tooltip: 'Previous',
+                        onPressed: () => bloc.add(const NavigatePrev()),
+                      ),
+                    if (state.hasNext)
+                      _NavigationButton(
+                        icon: Icons.chevron_right,
+                        alignment: Alignment.centerRight,
+                        tooltip: 'Next',
+                        onPressed: () => bloc.add(const NavigateNext()),
+                      ),
+                  ],
                 ),
               ),
-              const Text(
-                'Open Image',
-                style: TextStyle(color: Colors.white, fontSize: 15),
-              ),
+              if (showChrome && state.totalImages > 1)
+                ImageOverview(
+                  imagePaths: state.images.map((e) => e.path).toList(),
+                  currentIndex: state.currentIndex,
+                  onImageTap: (index) => bloc.add(GoToIndex(index)),
+                ),
+              if (showChrome) const OmniFooter(),
             ],
           ),
         ),
@@ -195,36 +282,179 @@ class _ImageViewerPageState extends State<ImageViewerPage>
     );
   }
 
-  void _showDeleteDialog(BuildContext context) {
-    final state = context.read<ImageViewerBloc>().state;
-    if (state.currentImage == null) return;
+  List<Widget> _buildActions(BuildContext context, ImageViewerState state) {
+    final bloc = context.read<ImageViewerBloc>();
+    return [
+      if (_canShare)
+        _ActionButton(
+          icon: Icons.share,
+          tooltip: 'Share',
+          onPressed: () => bloc.add(const ShareCurrent()),
+        ),
+      _ActionButton(
+        icon: Icons.info_outline,
+        tooltip: 'Information (I)',
+        onPressed: () => _showInfoDialog(context, state.currentImage!),
+      ),
+      _ActionButton(
+        icon: state.isFullscreen ? Icons.fullscreen_exit : Icons.fullscreen,
+        tooltip: 'Fullscreen (F)',
+        onPressed: () => bloc.add(const ToggleFullscreen()),
+      ),
+      _ActionButton(
+        icon: Icons.delete_outline,
+        tooltip: 'Delete (Del)',
+        onPressed: () => _showDeleteDialog(context),
+      ),
+    ];
+  }
+
+  void _showInfoDialog(BuildContext context, ImageItem image) {
+    final rows = <(String, String)>[
+      ('Name', image.title),
+      ('Folder', PathUtils.getDirectoryPath(image.path)),
+      ('Type', PathUtils.getExtension(image.path).toUpperCase()),
+      if (image.size != null) ('Size', FormatUtils.formatBytes(image.size!)),
+      if (image.creationTime.isNotEmpty) ('Modified', image.creationTime),
+    ];
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppTheme.buttonBackground,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Information', style: AppTheme.dialogTitleStyle),
+        content: SizedBox(
+          width: 400,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (final (label, value) in rows)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(
+                        width: 80,
+                        child: Text(
+                          label,
+                          style: const TextStyle(color: Colors.white70),
+                        ),
+                      ),
+                      Expanded(
+                        child: SelectableText(
+                          value,
+                          style: AppTheme.dialogContentStyle,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Close', style: AppTheme.buttonTextStyle),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeleteDialog(BuildContext context) {
+    // Read the bloc here: the dialog route is outside this page's BlocProvider
+    final bloc = context.read<ImageViewerBloc>();
+    final image = bloc.state.currentImage;
+    if (image == null) return;
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
         title: Text(
-          'Delete "${state.currentImage!.title}"',
+          'Delete "${image.title}"',
           overflow: TextOverflow.ellipsis,
           style: AppTheme.dialogTitleStyle,
         ),
-        content: Text(
+        content: const Text(
           'This image will be deleted permanently. Are you sure?',
           style: AppTheme.dialogContentStyle,
         ),
         actions: [
           TextButton(
-            onPressed: () {
-              context.read<ImageViewerBloc>().add(const DeleteCurrent());
-              Navigator.of(context).pop();
-            },
-            child: const Text('Delete', style: AppTheme.buttonTextStyle),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () => Navigator.of(dialogContext).pop(),
             child: const Text('Cancel', style: AppTheme.buttonTextStyle),
           ),
+          TextButton(
+            onPressed: () {
+              bloc.add(const DeleteCurrent());
+              Navigator.of(dialogContext).pop();
+            },
+            child: Text(
+              'Delete',
+              style: AppTheme.buttonTextStyle.copyWith(
+                color: const Color.fromARGB(255, 255, 137, 129),
+              ),
+            ),
+          ),
         ],
+      ),
+    );
+  }
+}
+
+/// App bar action icon
+class _ActionButton extends StatelessWidget {
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onPressed;
+
+  const _ActionButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      icon: Icon(icon, color: Colors.white),
+      tooltip: tooltip,
+      onPressed: onPressed,
+    );
+  }
+}
+
+/// Round previous/next button floating over the image
+class _NavigationButton extends StatelessWidget {
+  final IconData icon;
+  final Alignment alignment;
+  final String tooltip;
+  final VoidCallback onPressed;
+
+  const _NavigationButton({
+    required this.icon,
+    required this.alignment,
+    required this.tooltip,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: alignment,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: AppConstants.paddingLarge),
+        child: Material(
+          color: Colors.black.withValues(alpha: 0.4),
+          shape: const CircleBorder(),
+          child: IconButton(
+            icon: Icon(icon, color: Colors.white, size: 32),
+            tooltip: tooltip,
+            onPressed: onPressed,
+          ),
+        ),
       ),
     );
   }

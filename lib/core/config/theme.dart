@@ -92,6 +92,7 @@ class AppTheme {
   /// Creates the app's dark theme
   static ThemeData get darkTheme => ThemeData(
         brightness: Brightness.dark,
+        fontFamily: AppConstants.fontFamily,
         scaffoldBackgroundColor: backgroundColor,
         colorScheme: const ColorScheme.dark(
           primary: Color(0xFF50E3C2),

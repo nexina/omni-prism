@@ -8,9 +8,13 @@ class LoadImages extends ImageViewerEvent {
   final String folderPath;
   final int initialIndex;
 
+  /// Path of the image to open first; takes precedence over [initialIndex]
+  final String? initialPath;
+
   const LoadImages({
     required this.folderPath,
     this.initialIndex = 0,
+    this.initialPath,
   });
 }
 

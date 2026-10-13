@@ -1,4 +1,5 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:path/path.dart' as p;
 import 'package:omni_prism/features/image_viewer/data/models/image_item.dart';
 import 'package:omni_prism/features/image_viewer/domain/usecases/delete_image.dart';
 import 'package:omni_prism/features/image_viewer/domain/usecases/get_images_in_folder.dart';
@@ -40,7 +41,20 @@ class ImageViewerBloc extends Bloc<ImageViewerEvent, ImageViewerState> {
     emit(state.copyWith(status: ImageViewerStatus.loading));
 
     try {
-      final images = await _getImagesInFolder(event.folderPath);
+      final images = List<ImageItem>.from(await _getImagesInFolder(event.folderPath));
+
+      // Find initial index, keeping the requested file even if the folder
+      // scan did not pick it up (e.g. unreadable folder or unknown extension)
+      int initialIndex = event.initialIndex;
+      final initialPath = event.initialPath;
+      if (initialPath != null) {
+        initialIndex = images.indexWhere((e) => p.equals(e.path, initialPath));
+        if (initialIndex == -1) {
+          images.insert(0, ImageItem.fromFile(initialPath));
+          initialIndex = 0;
+        }
+      }
+
       if (images.isEmpty) {
         emit(state.copyWith(
           status: ImageViewerStatus.empty,
@@ -49,8 +63,6 @@ class ImageViewerBloc extends Bloc<ImageViewerEvent, ImageViewerState> {
         return;
       }
 
-      // Find initial index
-      int initialIndex = event.initialIndex;
       if (initialIndex < 0 || initialIndex >= images.length) {
         initialIndex = 0;
       }

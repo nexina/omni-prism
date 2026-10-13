@@ -105,18 +105,14 @@ flutter:
   # "family" key with the font family name, and a "fonts" key with a
   # list giving the asset and other descriptors for the font. For
   # example:
-  # fonts:
-  #   - family: Inria Sans
-  #     fonts:
-  #       - asset: assets/fonts/Inria_Sans/InriaSans-Regular.ttf
-  #       - asset: assets/fonts/Inria_Sans/InriaSans-Italic.ttf
-  #         style: italic
-  #       - asset: assets/fonts/Inria_Sans/InriaSans-Bold.ttf
-  #
-  #   - family: Noto Serif Display
-  #     fonts:
-  #       - asset: assets/fonts/Noto_Serif_Display/NotoSerifDisplay-Light.ttf
-  #       - asset: assets/fonts/Noto_Serif_Display/NotoSerifDisplay-Bold.ttf
+  fonts:
+    - family: Inria Sans
+      fonts:
+        - asset: assets/fonts/Inria_Sans/InriaSans-Regular.ttf
+        - asset: assets/fonts/Inria_Sans/InriaSans-Italic.ttf
+          style: italic
+        - asset: assets/fonts/Inria_Sans/InriaSans-Bold.ttf
+          weight: 700
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/custom-fonts/#from-packages

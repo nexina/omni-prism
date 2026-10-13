@@ -1,6 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:omni_prism/core/class/working_file.dart';
+import 'package:omni_prism/core/di/injection_container.dart';
+import 'package:omni_prism/features/gallery/presentation/pages/gallery_page.dart';
+import 'package:omni_prism/features/about/presentation/pages/about_page.dart';
+import 'package:omni_prism/features/image_viewer/presentation/pages/image_viewer_page.dart';
+import 'package:omni_prism/features/image_viewer/presentation/bloc/image_viewer_bloc.dart';
 
 /// Application router using GoRouter
 class AppRouter {
@@ -36,24 +42,18 @@ class AppRouter {
       return null;
     },
     routes: [
-      // Home/Gallery route
+      // Home route - Gallery page
       GoRoute(
         path: homePath,
         name: homeRoute,
-        builder: (context, state) {
-          // TODO: Replace with actual GalleryPage when implemented
-          return const _PlaceholderPage(title: 'Gallery');
-        },
+        builder: (context, state) => const GalleryPage(),
       ),
 
       // Gallery route (explicit)
       GoRoute(
         path: galleryPath,
         name: galleryRoute,
-        builder: (context, state) {
-          // TODO: Replace with actual GalleryPage when implemented
-          return const _PlaceholderPage(title: 'Gallery');
-        },
+        builder: (context, state) => const GalleryPage(),
       ),
 
       // Image Viewer route
@@ -62,11 +62,10 @@ class AppRouter {
         name: imageViewerRoute,
         pageBuilder: (context, state) {
           final workingFile = state.extra as WorkingFile?;
-          // TODO: Replace with actual ImageViewerPage when implemented
           return NoTransitionPage(
-            child: _PlaceholderPage(
-              title: 'Image Viewer',
-              subtitle: workingFile?.workingPath ?? 'No file',
+            child: BlocProvider<ImageViewerBloc>(
+              create: (_) => getIt<ImageViewerBloc>(),
+              child: ImageViewerPage(workingFile: workingFile!),
             ),
           );
         },
@@ -76,10 +75,7 @@ class AppRouter {
       GoRoute(
         path: aboutPath,
         name: aboutRoute,
-        builder: (context, state) {
-          // TODO: Replace with actual AboutPage when implemented
-          return const _PlaceholderPage(title: 'About');
-        },
+        builder: (context, state) => const AboutPage(),
       ),
 
       // Settings route
@@ -98,7 +94,6 @@ class AppRouter {
         path: editImagePath,
         name: editImageRoute,
         builder: (context, state) {
-          // TODO: Replace with actual EditImagePage when implemented
           return const _PlaceholderPage(title: 'Edit Image');
         },
       ),
@@ -106,8 +101,8 @@ class AppRouter {
   );
 
   /// Navigate to image viewer with a working file
-  static void navigateToImageViewer(WorkingFile file) {
-    router.pushNamed(imageViewerRoute, extra: file);
+  static Future<void> navigateToImageViewer(WorkingFile file) {
+    return router.pushNamed<void>(imageViewerRoute, extra: file);
   }
 
   /// Navigate to gallery
