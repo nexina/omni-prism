@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:window_manager/window_manager.dart';
 import 'package:omni_prism/core/class/working_file.dart';
 import 'package:omni_prism/core/config/constants.dart';
 import 'package:omni_prism/core/config/theme.dart';
@@ -32,10 +31,6 @@ class ImageViewerPage extends StatefulWidget {
 class _ImageViewerPageState extends State<ImageViewerPage> {
   PageController? _pageController;
   bool _isZoomed = false;
-  bool _isWindowFullScreen = false;
-
-  static bool get _isDesktop =>
-      Platform.isWindows || Platform.isLinux || Platform.isMacOS;
 
   // share_plus cannot share files on Linux
   static bool get _canShare => !Platform.isLinux;
@@ -55,18 +50,7 @@ class _ImageViewerPageState extends State<ImageViewerPage> {
   @override
   void dispose() {
     _pageController?.dispose();
-    if (_isWindowFullScreen) _setWindowFullScreen(false);
     super.dispose();
-  }
-
-  Future<void> _setWindowFullScreen(bool value) async {
-    if (!_isDesktop) return;
-    _isWindowFullScreen = value;
-    try {
-      await windowManager.setFullScreen(value);
-    } catch (_) {
-      // Window manager may be unavailable (e.g. in tests)
-    }
   }
 
   /// Keeps the PageView in step with the bloc's current index
@@ -99,10 +83,6 @@ class _ImageViewerPageState extends State<ImageViewerPage> {
               prev.currentIndex != curr.currentIndex ||
               prev.images.length != curr.images.length,
           listener: _onStateChanged,
-        ),
-        BlocListener<ImageViewerBloc, ImageViewerState>(
-          listenWhen: (prev, curr) => prev.isFullscreen != curr.isFullscreen,
-          listener: (context, state) => _setWindowFullScreen(state.isFullscreen),
         ),
         BlocListener<ImageViewerBloc, ImageViewerState>(
           listenWhen: (prev, curr) =>
