@@ -8,6 +8,7 @@ import 'package:omni_prism/core/config/constants.dart';
 import 'package:omni_prism/core/config/file_types.dart';
 import 'package:omni_prism/core/di/injection_container.dart';
 import 'package:omni_prism/core/router/app_router.dart';
+import 'package:omni_prism/core/utils/format_utils.dart';
 import 'package:omni_prism/core/utils/path_utils.dart';
 import 'package:omni_prism/core/widgets/index.dart';
 import 'package:omni_prism/features/gallery/presentation/bloc/gallery_bloc.dart';
@@ -38,6 +39,7 @@ class _GalleryPageView extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const _GalleryHeader(),
+          const _FolderChips(),
           const SizedBox(height: 12),
           Expanded(
             child: Container(
@@ -57,8 +59,10 @@ class _GalleryPageView extends StatelessWidget {
                         return const GalleryLoadingState();
                       case GalleryStatus.empty:
                         return GalleryEmptyState(
-                          message:
-                              'No images found in "${_folderName(state.folderPath)}"',
+                          message: state.hasFolders
+                              ? 'No images found in the added folders'
+                              : 'Add a folder to see its images here.\n'
+                                  'Nothing is scanned until you add one.',
                           onPickFolder: () => bloc.add(const PickCustomFolder()),
                         );
                       case GalleryStatus.error:
@@ -82,11 +86,6 @@ class _GalleryPageView extends StatelessWidget {
         ],
       ),
     );
-  }
-
-  static String _folderName(String path) {
-    if (path.isEmpty) return 'Gallery';
-    return PathUtils.getFileName(path);
   }
 }
 
@@ -120,8 +119,9 @@ class _GalleryHeader extends StatelessWidget {
           Expanded(
             child: BlocBuilder<GalleryBloc, GalleryState>(
               buildWhen: (prev, curr) =>
-                  prev.folderPath != curr.folderPath ||
-                  prev.images.length != curr.images.length,
+                  prev.folders != curr.folders ||
+                  prev.images.length != curr.images.length ||
+                  prev.isLoading != curr.isLoading,
               builder: (context, state) {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -135,30 +135,53 @@ class _GalleryHeader extends StatelessWidget {
                         fontFamily: AppConstants.fontFamily,
                       ),
                     ),
-                    if (state.folderPath.isNotEmpty)
-                      Text(
-                        '${state.folderPath}  ·  ${state.images.length} images',
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: Colors.white70,
-                          fontFamily: AppConstants.fontFamily,
-                        ),
+                    if (state.hasFolders)
+                      Row(
+                        children: [
+                          if (state.isLoading) ...[
+                            const SizedBox.square(
+                              dimension: 10,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 1.5,
+                                color: Colors.white70,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                          ],
+                          Expanded(
+                            child: Text(
+                              '${FormatUtils.formatNumber(state.imageCount)} images'
+                              ' in ${state.folders.length} '
+                              '${state.folders.length == 1 ? 'folder' : 'folders'}'
+                              '${state.isLoading ? '  ·  scanning…' : ''}',
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: Colors.white70,
+                                fontFamily: AppConstants.fontFamily,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                   ],
                 );
               },
             ),
           ),
-          IconButton(
-            tooltip: 'Refresh',
-            icon: const Icon(Icons.refresh, color: Colors.white),
-            onPressed: () =>
-                context.read<GalleryBloc>().add(const RefreshGallery()),
+          BlocSelector<GalleryBloc, GalleryState, bool>(
+            selector: (state) => state.hasFolders,
+            builder: (context, hasFolders) => IconButton(
+              tooltip: 'Rescan',
+              icon: const Icon(Icons.refresh, color: Colors.white),
+              onPressed: hasFolders
+                  ? () => context.read<GalleryBloc>().add(const RefreshGallery())
+                  : null,
+            ),
           ),
           const SizedBox(width: 8),
           _WhiteButton(
-            label: 'Open Folder',
+            label: 'Add Folder',
             onPressed: () =>
                 context.read<GalleryBloc>().add(const PickCustomFolder()),
           ),
@@ -169,6 +192,51 @@ class _GalleryHeader extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Removable chips for the folders added to the gallery
+class _FolderChips extends StatelessWidget {
+  const _FolderChips();
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocSelector<GalleryBloc, GalleryState, List<String>>(
+      selector: (state) => state.folders,
+      builder: (context, folders) {
+        if (folders.isEmpty) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.only(left: 24.0, top: 12.0, right: 24.0),
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final folder in folders)
+                Tooltip(
+                  message: folder,
+                  child: InputChip(
+                    avatar: const Icon(Icons.folder, size: 16, color: Colors.white),
+                    label: Text(
+                      PathUtils.getFileName(folder),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontFamily: AppConstants.fontFamily,
+                      ),
+                    ),
+                    backgroundColor: Colors.white.withValues(alpha: 0.1),
+                    side: const BorderSide(color: Colors.white54),
+                    deleteIcon: const Icon(Icons.close, size: 16),
+                    deleteIconColor: Colors.white70,
+                    deleteButtonTooltipMessage: 'Remove folder',
+                    onDeleted: () =>
+                        context.read<GalleryBloc>().add(RemoveFolder(folder)),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

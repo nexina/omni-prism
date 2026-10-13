@@ -20,7 +20,25 @@ class GalleryRepositoryImpl implements GalleryRepository {
   }
 
   @override
+  Stream<List<ImageItem>> scanImages(String folderPath) {
+    return _localDataSource.scanImages(folderPath);
+  }
+
+  @override
+  Future<Set<String>> findMissing(List<String> paths) {
+    return _localDataSource.findMissing(paths);
+  }
+
+  @override
   Future<String?> pickCustomFolder() async {
     return _localDataSource.pickCustomFolder();
+  }
+
+  @override
+  List<String> getSavedFolders() => _localDataSource.getSavedFolders();
+
+  @override
+  Future<void> saveFolders(List<String> folders) {
+    return _localDataSource.saveFolders(folders);
   }
 }

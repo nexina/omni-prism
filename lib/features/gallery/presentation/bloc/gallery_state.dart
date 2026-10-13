@@ -13,14 +13,14 @@ enum GalleryStatus {
 class GalleryState {
   final GalleryStatus status;
   final List<ImageItem> images;
-  final String folderPath;
+  final List<String> folders;
   final bool isLoading;
   final String? error;
 
   const GalleryState({
     required this.status,
     this.images = const [],
-    this.folderPath = '',
+    this.folders = const [],
     this.isLoading = false,
     this.error,
   });
@@ -29,7 +29,7 @@ class GalleryState {
   const GalleryState.initial()
       : status = GalleryStatus.initial,
         images = const [],
-        folderPath = '',
+        folders = const [],
         isLoading = false,
         error = null;
 
@@ -37,18 +37,21 @@ class GalleryState {
   GalleryState copyWith({
     GalleryStatus? status,
     List<ImageItem>? images,
-    String? folderPath,
+    List<String>? folders,
     bool? isLoading,
     String? error,
   }) {
     return GalleryState(
       status: status ?? this.status,
       images: images ?? this.images,
-      folderPath: folderPath ?? this.folderPath,
+      folders: folders ?? this.folders,
       isLoading: isLoading ?? this.isLoading,
       error: error ?? this.error,
     );
   }
+
+  /// Whether the user has added any folder
+  bool get hasFolders => folders.isNotEmpty;
 
   /// Whether the gallery has images
   bool get hasImages => images.isNotEmpty;
@@ -62,7 +65,7 @@ class GalleryState {
     return other is GalleryState &&
         other.status == status &&
         other.images == images &&
-        other.folderPath == folderPath &&
+        other.folders == folders &&
         other.isLoading == isLoading &&
         other.error == error;
   }
@@ -71,12 +74,12 @@ class GalleryState {
   int get hashCode => Object.hash(
         status,
         images,
-        folderPath,
+        folders,
         isLoading,
         error,
       );
 
   @override
-  String toString() => 'GalleryState(status: $status, folderPath: $folderPath, '
+  String toString() => 'GalleryState(status: $status, folders: ${folders.length}, '
       'images: ${images.length}, isLoading: $isLoading, error: $error)';
 }

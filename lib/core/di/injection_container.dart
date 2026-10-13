@@ -11,9 +11,10 @@ import 'package:omni_prism/features/image_viewer/presentation/bloc/image_viewer_
 import 'package:omni_prism/features/gallery/data/datasources/local/gallery_local_datasource.dart';
 import 'package:omni_prism/features/gallery/data/repositories/gallery_repository.dart';
 import 'package:omni_prism/features/gallery/domain/repositories/gallery_repository.dart';
-import 'package:omni_prism/features/gallery/domain/usecases/get_default_image_folder.dart';
+import 'package:omni_prism/features/gallery/domain/usecases/manage_gallery_folders.dart';
 import 'package:omni_prism/features/gallery/domain/usecases/load_gallery_images.dart';
 import 'package:omni_prism/features/gallery/domain/usecases/pick_custom_folder.dart';
+import 'package:omni_prism/features/gallery/domain/usecases/scan_gallery_images.dart';
 import 'package:omni_prism/features/gallery/presentation/bloc/gallery_bloc.dart';
 import 'package:omni_prism/features/about/presentation/bloc/about_bloc.dart';
 
@@ -60,7 +61,7 @@ Future<void> init() async {
   /// ----------------------------------------------------------
   // Data Sources
   getIt.registerLazySingleton<GalleryLocalDataSource>(
-    () => GalleryLocalDataSourceImpl(),
+    () => GalleryLocalDataSourceImpl(preferences: getIt()),
   );
 
   // Repositories
@@ -69,11 +70,14 @@ Future<void> init() async {
   );
 
   // Use Cases
-  getIt.registerLazySingleton<GetDefaultImageFolderUseCase>(
-    () => GetDefaultImageFolderUseCase(getIt<GalleryRepository>()),
+  getIt.registerLazySingleton<ManageGalleryFoldersUseCase>(
+    () => ManageGalleryFoldersUseCase(getIt<GalleryRepository>()),
   );
   getIt.registerLazySingleton<LoadGalleryImagesUseCase>(
     () => LoadGalleryImagesUseCase(getIt<GalleryRepository>()),
+  );
+  getIt.registerLazySingleton<ScanGalleryImagesUseCase>(
+    () => ScanGalleryImagesUseCase(getIt<GalleryRepository>()),
   );
   getIt.registerLazySingleton<PickCustomFolderUseCase>(
     () => PickCustomFolderUseCase(getIt<GalleryRepository>()),
@@ -81,8 +85,8 @@ Future<void> init() async {
 
   // BLoC
   getIt.registerFactory<GalleryBloc>(() => GalleryBloc(
-    getDefaultImageFolder: getIt<GetDefaultImageFolderUseCase>(),
-    loadGalleryImages: getIt<LoadGalleryImagesUseCase>(),
+    manageFolders: getIt<ManageGalleryFoldersUseCase>(),
+    scanGalleryImages: getIt<ScanGalleryImagesUseCase>(),
     pickCustomFolder: getIt<PickCustomFolderUseCase>(),
   ));
 

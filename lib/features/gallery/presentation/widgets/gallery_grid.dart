@@ -183,7 +183,7 @@ class GalleryEmptyState extends StatelessWidget {
                   side: const BorderSide(color: Colors.white),
                 ),
                 icon: const Icon(Icons.folder_open),
-                label: const Text('Open Folder'),
+                label: const Text('Add Folder'),
               ),
             ],
           ],
