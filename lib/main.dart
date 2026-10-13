@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:omni_prism/core/di/injection_container.dart';
 import 'package:omni_prism/core/config/constants.dart';
+import 'package:omni_prism/core/utils/launch_args.dart';
+import 'package:omni_prism/core/router/app_router.dart';
 import 'package:omni_prism/omni_prism_app.dart';
 
 /// Application entry point
@@ -22,17 +24,22 @@ void main(List<String> args) async {
       backgroundColor: Colors.transparent,
       skipTaskbar: false,
     );
-    await windowManager.waitUntilReadyToShow(windowOptions);
+    await windowManager.waitUntilReadyToShow(windowOptions, () async {
+      await windowManager.show();
+      await windowManager.focus();
+    });
   }
 
   // Initialize dependency injection
   await init();
 
-  // TODO: Handle CLI args for opening specific images
-  // if (args.isNotEmpty) {
-  //   final imagePath = args[0];
-  //   // Navigate to image viewer with the image
-  // }
+  // Open the image passed via launch arguments, once the router is ready
+  final launchFile = await resolveLaunchFile(args);
+  if (launchFile != null) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      AppRouter.navigateToImageViewer(launchFile);
+    });
+  }
 
   // Run the app
   runApp(const OmniPrismApp());
