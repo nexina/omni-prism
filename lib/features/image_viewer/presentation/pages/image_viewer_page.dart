@@ -102,6 +102,7 @@ class _ImageViewerPageState extends State<ImageViewerPage> {
             case ImageViewerStatus.initial:
             case ImageViewerStatus.loading:
               return const BackgroundBuilder(
+                transparent: true,
                 child: Center(
                   child: CircularProgressIndicator(color: Colors.white),
                 ),
@@ -132,6 +133,7 @@ class _ImageViewerPageState extends State<ImageViewerPage> {
 
   Widget _buildMessage({required IconData icon, required String message}) {
     return BackgroundBuilder(
+      transparent: true,
       child: Column(
         children: [
           ViewerAppBar(title: PathUtils.getFileName(widget.workingFile.path)),
@@ -194,6 +196,7 @@ class _ImageViewerPageState extends State<ImageViewerPage> {
       child: Focus(
         autofocus: true,
         child: BackgroundBuilder(
+          transparent: true,
           overlayOpacity: showChrome ? 0.5 : 0.85,
           child: Column(
             children: [
