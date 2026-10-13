@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>nexina.omni.prism</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <name>Omni Prism</name>
+  <summary>Free, cross-platform image viewer and gallery</summary>
+  <developer id="nexina.omni.prism">
+    <name>NEXINA</name>
+  </developer>
+  <description>
+    <p>
+      Omni Prism is a fast, distraction-free image viewer with a built-in gallery for browsing the pictures on your computer.
+    </p>
+    <p>Features include:</p>
+    <ul>
+      <li>View JPEG, PNG, GIF, WEBP, BMP, ICO and SVG images</li>
+      <li>Gallery that scans the folders you choose and groups your images</li>
+      <li>Fullscreen viewing with a transparent, minimal interface</li>
+      <li>Open images directly from your file manager</li>
+    </ul>
+  </description>
+  <launchable type="desktop-id">nexina.omni.prism.desktop</launchable>
+  <url type="homepage">https://github.com/nexina/omni-prism</url>
+  <url type="bugtracker">https://github.com/nexina/omni-prism/issues</url>
+  <provides>
+    <binary>omni_prism</binary>
+  </provides>
+  <content_rating type="oars-1.1" />
+  <releases>
+    <release version="1.0.1" date="2026-10-14" />
+  </releases>
+</component>

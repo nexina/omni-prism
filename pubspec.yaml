@@ -1,5 +1,5 @@
 name: omni_prism
-description: "A new Flutter project."
+description: "A free, cross-platform image viewer and gallery."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -66,12 +66,16 @@ dev_dependencies:
 msix_config:
   display_name: Omni Prism
   publisher_display_name: Rakibul Hasan
-  publisher: CN=Rakibul Hasan
+  # Must match Partner Center > Product identity (same account as Omni Preview)
+  publisher: CN=C9F2AB4C-709E-4A69-A909-F5EF461BF3F8
   identity_name: RakibulHasan.OmniPrism
+  msix_version: 1.0.1.0
   store: true
   logo_path: assets/icons/omni_prism_ic.png
   capabilities: internetClient
-  file_extension: .jpg,.png,.jpeg,.gif,.webp,.bmp,.tiff,.svg,.eps,.raw,.cr2,.nef,.orf,.sr2,.pef,.dng,.x3f,.arw,.rw2,.rwl,.tif,.heic,.indd,.ai,.psd,.svgz,.eps,.pdf,.pct,.wmf,.emf,.ico,.icon,.webp
+  # Only formats the viewer can actually decode (Flutter codecs + flutter_svg)
+  file_extension: .jpg, .jpeg, .png, .gif, .webp, .bmp, .ico, .svg
+
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 

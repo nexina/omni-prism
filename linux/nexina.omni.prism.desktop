@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Omni Prism
+Comment=Free, cross-platform image viewer and gallery
+Exec=omni_prism %F
+Icon=nexina.omni.prism
+Type=Application
+Terminal=false
+Categories=Graphics;Viewer;2DGraphics;RasterGraphics;
+Keywords=image;photo;picture;gallery;viewer;
+MimeType=image/jpeg;image/png;image/gif;image/webp;image/bmp;image/x-bmp;image/svg+xml;image/vnd.microsoft.icon;image/x-icon;
+StartupWMClass=nexina.omni.prism
