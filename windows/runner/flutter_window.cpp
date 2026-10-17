@@ -27,6 +27,43 @@ bool FlutterWindow::OnCreate() {
   RegisterPlugins(flutter_controller_->engine());
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
+  window_channel_ =
+      std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
+          flutter_controller_->engine()->messenger(), "omni_prism/window",
+          &flutter::StandardMethodCodec::GetInstance());
+
+  window_channel_->SetMethodCallHandler(
+      [this](const flutter::MethodCall<flutter::EncodableValue>& call,
+             std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
+        if (call.method_name() == "setFullScreen") {
+          if (call.arguments()) {
+            bool full_screen = false;
+            if (std::holds_alternative<bool>(*call.arguments())) {
+              full_screen = std::get<bool>(*call.arguments());
+            } else if (std::holds_alternative<int32_t>(*call.arguments())) {
+              full_screen = std::get<int32_t>(*call.arguments()) != 0;
+            } else if (std::holds_alternative<int64_t>(*call.arguments())) {
+              full_screen = std::get<int64_t>(*call.arguments()) != 0;
+            } else {
+              result->Error("BAD_ARGS", "Expected a boolean argument for setFullScreen");
+              return;
+            }
+            SetFullScreen(full_screen);
+            result->Success();
+          } else {
+            result->Error("BAD_ARGS", "Arguments cannot be null for setFullScreen");
+          }
+        } else if (call.method_name() == "close") {
+          HWND hwnd = GetHandle();
+          if (hwnd) {
+            PostMessage(hwnd, WM_CLOSE, 0, 0);
+          }
+          result->Success();
+        } else {
+          result->NotImplemented();
+        }
+      });
+
   flutter_controller_->engine()->SetNextFrameCallback([&]() {
     this->Show();
   });
@@ -40,11 +77,51 @@ bool FlutterWindow::OnCreate() {
 }
 
 void FlutterWindow::OnDestroy() {
+  if (window_channel_) {
+    window_channel_ = nullptr;
+  }
+
   if (flutter_controller_) {
     flutter_controller_ = nullptr;
   }
 
   Win32Window::OnDestroy();
+}
+
+void FlutterWindow::SetFullScreen(bool fullscreen) {
+  if (fullscreen == is_fullscreen_) {
+    return;
+  }
+  HWND hwnd = GetHandle();
+  if (!hwnd) {
+    return;
+  }
+
+  DWORD style = GetWindowLong(hwnd, GWL_STYLE);
+  if (fullscreen) {
+    MONITORINFO mi = {sizeof(mi)};
+    saved_window_placement_.length = sizeof(saved_window_placement_);
+    if (GetWindowPlacement(hwnd, &saved_window_placement_) &&
+        GetMonitorInfo(MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST), &mi)) {
+      is_fullscreen_ = true;
+      SetWindowLong(hwnd, GWL_STYLE, style & ~WS_OVERLAPPEDWINDOW);
+      SetWindowPos(hwnd, HWND_TOP,
+                   mi.rcMonitor.left, mi.rcMonitor.top,
+                   mi.rcMonitor.right - mi.rcMonitor.left,
+                   mi.rcMonitor.bottom - mi.rcMonitor.top,
+                   SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+    }
+  } else {
+    is_fullscreen_ = false;
+    SetWindowLong(hwnd, GWL_STYLE, style | WS_OVERLAPPEDWINDOW);
+    if (saved_window_placement_.showCmd == SW_SHOWMINIMIZED) {
+      saved_window_placement_.showCmd = SW_SHOWNORMAL;
+    }
+    SetWindowPlacement(hwnd, &saved_window_placement_);
+    SetWindowPos(hwnd, nullptr, 0, 0, 0, 0,
+                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER |
+                 SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+  }
 }
 
 LRESULT
@@ -64,6 +141,22 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
   switch (message) {
     case WM_FONTCHANGE:
       flutter_controller_->engine()->ReloadSystemFonts();
+      break;
+    case WM_GETMINMAXINFO:
+      if (is_fullscreen_) {
+        auto min_max_info = reinterpret_cast<MINMAXINFO*>(lparam);
+        HMONITOR monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+        MONITORINFO mi = {sizeof(mi)};
+        if (GetMonitorInfo(monitor, &mi)) {
+          min_max_info->ptMaxPosition.x = mi.rcMonitor.left;
+          min_max_info->ptMaxPosition.y = mi.rcMonitor.top;
+          min_max_info->ptMaxSize.x = mi.rcMonitor.right - mi.rcMonitor.left;
+          min_max_info->ptMaxSize.y = mi.rcMonitor.bottom - mi.rcMonitor.top;
+          min_max_info->ptMaxTrackSize.x = min_max_info->ptMaxSize.x;
+          min_max_info->ptMaxTrackSize.y = min_max_info->ptMaxSize.y;
+          return 0;
+        }
+      }
       break;
   }
 

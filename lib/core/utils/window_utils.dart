@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/services.dart';
 
-/// Controls the native app window (implemented by the Linux runner)
+/// Controls the native app window (implemented by Linux and Windows runners)
 class WindowUtils {
   static const MethodChannel _channel = MethodChannel('omni_prism/window');
 
