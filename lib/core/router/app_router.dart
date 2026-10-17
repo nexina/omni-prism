@@ -61,11 +61,19 @@ class AppRouter {
         path: imageViewerPath,
         name: imageViewerRoute,
         pageBuilder: (context, state) {
-          final workingFile = state.extra as WorkingFile?;
+          final extra = state.extra;
+          final (workingFile, fullscreen) = switch (extra) {
+            (WorkingFile file, bool fullscreen) => (file, fullscreen),
+            WorkingFile file => (file, false),
+            _ => (null, false),
+          };
           return NoTransitionPage(
             child: BlocProvider<ImageViewerBloc>(
               create: (_) => getIt<ImageViewerBloc>(),
-              child: ImageViewerPage(workingFile: workingFile!),
+              child: ImageViewerPage(
+                workingFile: workingFile!,
+                startFullscreen: fullscreen,
+              ),
             ),
           );
         },
@@ -100,9 +108,16 @@ class AppRouter {
     ],
   );
 
-  /// Navigate to image viewer with a working file
-  static Future<void> navigateToImageViewer(WorkingFile file) {
-    return router.pushNamed<void>(imageViewerRoute, extra: file);
+  /// Navigate to image viewer with a working file, optionally starting
+  /// in fullscreen
+  static Future<void> navigateToImageViewer(
+    WorkingFile file, {
+    bool fullscreen = false,
+  }) {
+    return router.pushNamed<void>(
+      imageViewerRoute,
+      extra: (file, fullscreen),
+    );
   }
 
   /// Navigate to gallery

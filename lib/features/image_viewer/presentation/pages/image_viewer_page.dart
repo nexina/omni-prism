@@ -8,6 +8,7 @@ import 'package:omni_prism/core/config/constants.dart';
 import 'package:omni_prism/core/config/theme.dart';
 import 'package:omni_prism/core/utils/format_utils.dart';
 import 'package:omni_prism/core/utils/path_utils.dart';
+import 'package:omni_prism/core/utils/window_utils.dart';
 import 'package:omni_prism/core/widgets/index.dart';
 import 'package:omni_prism/features/image_viewer/data/models/image_item.dart';
 import 'package:omni_prism/features/image_viewer/presentation/bloc/image_viewer_bloc.dart';
@@ -19,9 +20,13 @@ import 'package:omni_prism/features/image_viewer/presentation/widgets/index.dart
 class ImageViewerPage extends StatefulWidget {
   final WorkingFile workingFile;
 
+  /// Opens in fullscreen, e.g. when launched directly with an image
+  final bool startFullscreen;
+
   const ImageViewerPage({
     super.key,
     required this.workingFile,
+    this.startFullscreen = false,
   });
 
   @override
@@ -32,6 +37,9 @@ class _ImageViewerPageState extends State<ImageViewerPage> {
   PageController? _pageController;
   bool _isZoomed = false;
 
+  /// Whether this page made the window fullscreen
+  bool _isWindowFullScreen = false;
+
   // share_plus cannot share files on Linux
   static bool get _canShare => !Platform.isLinux;
 
@@ -39,18 +47,28 @@ class _ImageViewerPageState extends State<ImageViewerPage> {
   void initState() {
     super.initState();
     final path = widget.workingFile.workingPath;
-    context.read<ImageViewerBloc>().add(
-          LoadImages(
-            folderPath: PathUtils.getDirectoryPath(path),
-            initialPath: path,
-          ),
-        );
+    final bloc = context.read<ImageViewerBloc>();
+    bloc.add(
+      LoadImages(
+        folderPath: PathUtils.getDirectoryPath(path),
+        initialPath: path,
+      ),
+    );
+    if (widget.startFullscreen) bloc.add(const SetFullscreen(true));
   }
 
   @override
   void dispose() {
     _pageController?.dispose();
+    if (_isWindowFullScreen) WindowUtils.setFullScreen(false);
     super.dispose();
+  }
+
+  /// Makes the real window fullscreen along with the viewer
+  void _setWindowFullScreen(bool value) {
+    if (value == _isWindowFullScreen) return;
+    _isWindowFullScreen = value;
+    WindowUtils.setFullScreen(value);
   }
 
   /// Keeps the PageView in step with the bloc's current index
@@ -83,6 +101,10 @@ class _ImageViewerPageState extends State<ImageViewerPage> {
               prev.currentIndex != curr.currentIndex ||
               prev.images.length != curr.images.length,
           listener: _onStateChanged,
+        ),
+        BlocListener<ImageViewerBloc, ImageViewerState>(
+          listenWhen: (prev, curr) => prev.isFullscreen != curr.isFullscreen,
+          listener: (context, state) => _setWindowFullScreen(state.isFullscreen),
         ),
         BlocListener<ImageViewerBloc, ImageViewerState>(
           listenWhen: (prev, curr) =>
@@ -162,7 +184,7 @@ class _ImageViewerPageState extends State<ImageViewerPage> {
   Widget _buildViewer(BuildContext context, ImageViewerState state) {
     final bloc = context.read<ImageViewerBloc>();
     final image = state.currentImage!;
-    final showChrome = state.isVisible && !state.isFullscreen;
+    final showChrome = state.isVisible;
     _pageController ??= PageController(initialPage: state.currentIndex);
 
     final details = <String>[
@@ -289,6 +311,15 @@ class _ImageViewerPageState extends State<ImageViewerPage> {
         tooltip: 'Delete (Del)',
         onPressed: () => _showDeleteDialog(context),
       ),
+      // Fullscreen hides the window's own close button
+      if (state.isFullscreen) ...[
+        const SizedBox(width: 8),
+        _ActionButton(
+          icon: Icons.close,
+          tooltip: 'Close',
+          onPressed: WindowUtils.close,
+        ),
+      ],
     ];
   }
 

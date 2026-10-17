@@ -50,6 +50,13 @@ class ToggleFullscreen extends ImageViewerEvent {
   const ToggleFullscreen();
 }
 
+/// Enter or leave fullscreen mode
+class SetFullscreen extends ImageViewerEvent {
+  final bool fullscreen;
+
+  const SetFullscreen(this.fullscreen);
+}
+
 /// Toggle UI visibility
 class ToggleVisibility extends ImageViewerEvent {
   const ToggleVisibility();

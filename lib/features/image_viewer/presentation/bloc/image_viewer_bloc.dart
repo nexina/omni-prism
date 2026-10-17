@@ -32,6 +32,7 @@ class ImageViewerBloc extends Bloc<ImageViewerEvent, ImageViewerState> {
     on<DeleteCurrent>(_onDeleteCurrent);
     on<ShareCurrent>(_onShareCurrent);
     on<ToggleFullscreen>(_onToggleFullscreen);
+    on<SetFullscreen>(_onSetFullscreen);
     on<ToggleVisibility>(_onToggleVisibility);
     on<SetFolderPath>(_onSetFolderPath);
   }
@@ -172,6 +173,11 @@ class ImageViewerBloc extends Bloc<ImageViewerEvent, ImageViewerState> {
   /// Toggles fullscreen mode
   void _onToggleFullscreen(ToggleFullscreen event, Emitter<ImageViewerState> emit) {
     emit(state.copyWith(isFullscreen: !state.isFullscreen));
+  }
+
+  /// Enters or leaves fullscreen mode
+  void _onSetFullscreen(SetFullscreen event, Emitter<ImageViewerState> emit) {
+    emit(state.copyWith(isFullscreen: event.fullscreen));
   }
 
   /// Toggles UI visibility

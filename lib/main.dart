@@ -12,11 +12,11 @@ void main(List<String> args) async {
   // Show the gallery first; nothing else may delay the first frame
   runApp(const OmniPrismApp());
 
-  // Then open the image passed via launch arguments, if any
+  // Then open the image passed via launch arguments, if any, in fullscreen
   final launchFile = await resolveLaunchFile(args);
   if (launchFile != null) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      AppRouter.navigateToImageViewer(launchFile);
+      AppRouter.navigateToImageViewer(launchFile, fullscreen: true);
     });
     WidgetsBinding.instance.scheduleFrame();
   }
