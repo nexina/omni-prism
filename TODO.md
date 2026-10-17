@@ -2,11 +2,11 @@
 
 ## Before publishing
 
-- [ ] Export a high-res app icon (≥512×512) and replace the upscaled placeholders:
-  - [ ] `assets/icons/omni_prism_ic.png` (also used as MSIX `logo_path`)
-  - [ ] `linux/nexina.omni.prism.png`
-  - [ ] `snap/gui/nexina.omni.prism.png`
-  - [ ] `windows/runner/resources/app_icon.ico`
+- [x] Export a high-res app icon (≥512×512) and replace the upscaled placeholders:
+  - [x] `assets/icons/icon_1024.png` (MSIX `logo_path`), `assets/icons/omni_prism_ic.png` (in-app)
+  - [x] `linux/nexina.omni.prism.png` (512)
+  - [x] `snap/gui/nexina.omni.prism.png` (512)
+  - [x] `windows/runner/resources/app_icon.ico`
 - [ ] Confirm `msix_config.publisher` and `identity_name` in `pubspec.yaml` match
       Partner Center → Product management → Product identity
 - [ ] Reserve the app name "Omni Prism" in Partner Center

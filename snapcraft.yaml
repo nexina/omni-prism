@@ -11,6 +11,7 @@ description: |
   * Open images directly from your file manager
 
 title: Omni Prism
+icon: snap/gui/nexina.omni.prism.png
 contact: https://github.com/nexina/omni-prism/issues
 license: MIT
 issues: https://github.com/nexina/omni-prism/issues
@@ -55,7 +56,7 @@ parts:
       install -Dm644 linux/nexina.omni.prism.desktop \
         $CRAFT_PART_INSTALL/usr/share/applications/nexina.omni.prism.desktop
       install -Dm644 linux/nexina.omni.prism.png \
-        $CRAFT_PART_INSTALL/usr/share/icons/hicolor/256x256/apps/nexina.omni.prism.png
+        $CRAFT_PART_INSTALL/usr/share/icons/hicolor/512x512/apps/nexina.omni.prism.png
       install -Dm644 linux/nexina.omni.prism.metainfo.xml \
         $CRAFT_PART_INSTALL/usr/share/metainfo/nexina.omni.prism.metainfo.xml
       install -Dm644 LICENSE $CRAFT_PART_INSTALL/LICENSE
