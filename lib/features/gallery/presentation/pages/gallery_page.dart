@@ -11,6 +11,7 @@ import 'package:omni_prism/core/router/app_router.dart';
 import 'package:omni_prism/core/utils/format_utils.dart';
 import 'package:omni_prism/core/utils/path_utils.dart';
 import 'package:omni_prism/core/widgets/index.dart';
+import 'package:omni_prism/features/gallery/domain/entities/gallery_section.dart';
 import 'package:omni_prism/features/gallery/presentation/bloc/gallery_bloc.dart';
 import 'package:omni_prism/features/gallery/presentation/bloc/gallery_event.dart';
 import 'package:omni_prism/features/gallery/presentation/bloc/gallery_state.dart';
@@ -72,8 +73,10 @@ class _GalleryPageView extends StatelessWidget {
                         );
                       case GalleryStatus.loaded:
                         return GalleryGrid(
-                          images: state.images,
-                          onImageTap: (index) => bloc.add(SelectImage(index)),
+                          sections: state.sections,
+                          hasMore: state.hasMore,
+                          onLoadMore: () => bloc.add(const LoadMoreImages()),
+                          onImageTap: (image) => bloc.add(SelectImage(image)),
                         );
                     }
                   },
@@ -169,6 +172,7 @@ class _GalleryHeader extends StatelessWidget {
               },
             ),
           ),
+          const _GroupingMenu(),
           BlocSelector<GalleryBloc, GalleryState, bool>(
             selector: (state) => state.hasFolders,
             builder: (context, hasFolders) => IconButton(
@@ -191,6 +195,46 @@ class _GalleryHeader extends StatelessWidget {
             onPressed: () => _openFile(context),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Lets the user group the gallery by folder, month or year
+class _GroupingMenu extends StatelessWidget {
+  const _GroupingMenu();
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocSelector<GalleryBloc, GalleryState, GalleryGrouping>(
+      selector: (state) => state.grouping,
+      builder: (context, grouping) => PopupMenuButton<GalleryGrouping>(
+        tooltip: 'Group by',
+        initialValue: grouping,
+        onSelected: (value) =>
+            context.read<GalleryBloc>().add(ChangeGrouping(value)),
+        itemBuilder: (context) => [
+          for (final value in GalleryGrouping.values)
+            PopupMenuItem(value: value, child: Text(value.label)),
+        ],
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.sort, color: Colors.white),
+              const SizedBox(width: 6),
+              Text(
+                grouping.label,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontFamily: AppConstants.fontFamily,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -7,8 +7,17 @@ class ManageGalleryFoldersUseCase {
 
   ManageGalleryFoldersUseCase(this._repository);
 
-  /// The saved folders
-  List<String> getFolders() => _repository.getSavedFolders();
+  /// The saved folders. On first use these are the platform's image
+  /// folders (e.g. DCIM on Android, Pictures on desktop), saved so that
+  /// removing one sticks.
+  Future<List<String>> getFolders() async {
+    final saved = _repository.getSavedFolders();
+    if (saved != null) return saved;
+
+    final defaults = await _repository.getDefaultImageFolders();
+    await _repository.saveFolders(defaults);
+    return defaults;
+  }
 
   /// Adds [folder] to [folders] and saves the result. A folder already
   /// covered by an added parent is ignored; added subfolders of [folder]

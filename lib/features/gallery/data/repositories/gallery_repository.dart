@@ -15,6 +15,11 @@ class GalleryRepositoryImpl implements GalleryRepository {
   }
 
   @override
+  Future<List<String>> getDefaultImageFolders() {
+    return _localDataSource.getDefaultImageFolders();
+  }
+
+  @override
   Future<List<ImageItem>> getImagesInFolder(String folderPath) async {
     return _localDataSource.getImagesInFolder(folderPath);
   }
@@ -35,7 +40,7 @@ class GalleryRepositoryImpl implements GalleryRepository {
   }
 
   @override
-  List<String> getSavedFolders() => _localDataSource.getSavedFolders();
+  List<String>? getSavedFolders() => _localDataSource.getSavedFolders();
 
   @override
   Future<void> saveFolders(List<String> folders) {

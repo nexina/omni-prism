@@ -15,6 +15,10 @@ abstract class GalleryLocalDataSource {
   /// Gets the default Pictures folder path for the current platform
   Future<String> getDefaultPicturesFolder();
 
+  /// The platform's usual image folders that exist, e.g. DCIM and Pictures
+  /// on Android or the user's Pictures folder on desktop
+  Future<List<String>> getDefaultImageFolders();
+
   /// Gets all images in a folder
   Future<List<ImageItem>> getImagesInFolder(String folderPath);
 
@@ -29,8 +33,8 @@ abstract class GalleryLocalDataSource {
   /// Picks a custom folder using platform file picker
   Future<String?> pickCustomFolder();
 
-  /// Folders the user added to the gallery
-  List<String> getSavedFolders();
+  /// Folders the user added to the gallery, or null if never saved
+  List<String>? getSavedFolders();
 
   /// Persists the folders the user added to the gallery
   Future<void> saveFolders(List<String> folders);
@@ -41,13 +45,18 @@ class GalleryLocalDataSourceImpl implements GalleryLocalDataSource {
   static const String _foldersKey = 'gallery_folders';
 
   final SharedPreferences _preferences;
+  final Future<List<String>> Function()? _defaultImageFolders;
 
-  GalleryLocalDataSourceImpl({required SharedPreferences preferences})
-      : _preferences = preferences;
+  /// [defaultImageFolders] replaces the platform lookup (for tests)
+  GalleryLocalDataSourceImpl({
+    required SharedPreferences preferences,
+    Future<List<String>> Function()? defaultImageFolders,
+  })  : _preferences = preferences,
+        _defaultImageFolders = defaultImageFolders;
 
   @override
-  List<String> getSavedFolders() {
-    return _preferences.getStringList(_foldersKey) ?? const [];
+  List<String>? getSavedFolders() {
+    return _preferences.getStringList(_foldersKey);
   }
 
   @override
@@ -56,47 +65,76 @@ class GalleryLocalDataSourceImpl implements GalleryLocalDataSource {
   }
 
   @override
-  Future<String> getDefaultPicturesFolder() async {
-    if (Platform.isWindows) {
+  Future<List<String>> getDefaultImageFolders() async {
+    if (_defaultImageFolders != null) return _defaultImageFolders();
+
+    final candidates = <String>[];
+    final home = Platform.environment['HOME'];
+    if (Platform.isAndroid) {
+      // Shared storage root, e.g. /storage/emulated/0
+      var storageRoot = '/storage/emulated/0';
+      try {
+        final appDir = await getExternalStorageDirectory();
+        final index = appDir?.path.indexOf('/Android/') ?? -1;
+        if (index > 0) storageRoot = appDir!.path.substring(0, index);
+      } catch (_) {}
+      candidates.addAll([
+        p.join(storageRoot, 'DCIM'),
+        p.join(storageRoot, 'Pictures'),
+      ]);
+    } else if (Platform.isWindows) {
       final userProfile = Platform.environment['USERPROFILE'];
       if (userProfile != null) {
-        return '$userProfile\\Pictures';
+        candidates.add(p.join(userProfile, 'Pictures'));
+        // Pictures is often moved into OneDrive
+        final oneDrive = Platform.environment['OneDrive'];
+        if (oneDrive != null) candidates.add(p.join(oneDrive, 'Pictures'));
       }
     } else if (Platform.isLinux) {
-      final home = Platform.environment['HOME'];
       if (home != null) {
-        // Try XDG_PICTURES_DIR first
-        final xdgPictures = Platform.environment['XDG_PICTURES_DIR'];
-        if (xdgPictures != null && xdgPictures.isNotEmpty) {
-          return xdgPictures;
-        }
-        return '$home/Pictures';
+        candidates.add(_xdgPicturesDir(home) ?? p.join(home, 'Pictures'));
       }
     } else if (Platform.isMacOS) {
-      final home = Platform.environment['HOME'];
-      if (home != null) {
-        return '$home/Pictures';
-      }
-    } else if (Platform.isAndroid) {
-      // On Android, use external storage Pictures directory
-      try {
-        final directory = await getExternalStorageDirectory();
-        if (directory != null) {
-          // Navigate to Pictures folder
-          final picturesDir = Directory('${directory.path}/Pictures');
-          if (await picturesDir.exists()) {
-            return picturesDir.path;
-          }
-          // Fallback to DCIM
-          final dcimDir = Directory('${directory.path}/DCIM');
-          if (await dcimDir.exists()) {
-            return dcimDir.path;
-          }
-        }
-      } catch (_) {
-        // Fall through to app documents
-      }
+      if (home != null) candidates.add(p.join(home, 'Pictures'));
     }
+
+    final folders = <String>[];
+    for (final folder in candidates) {
+      final normalized = p.normalize(folder);
+      if (folders.any((f) => p.equals(f, normalized))) continue;
+      try {
+        if (await Directory(normalized).exists()) folders.add(normalized);
+      } catch (_) {}
+    }
+    return folders;
+  }
+
+  /// Reads the Pictures folder from XDG_PICTURES_DIR or
+  /// ~/.config/user-dirs.dirs, which may be localized or moved
+  static String? _xdgPicturesDir(String home) {
+    final fromEnv = Platform.environment['XDG_PICTURES_DIR'];
+    if (fromEnv != null && fromEnv.isNotEmpty) return fromEnv;
+    try {
+      final configHome = Platform.environment['XDG_CONFIG_HOME'] ??
+          p.join(home, '.config');
+      final lines = File(p.join(configHome, 'user-dirs.dirs')).readAsLinesSync();
+      for (final line in lines) {
+        final match =
+            RegExp(r'^XDG_PICTURES_DIR="(.*)"').firstMatch(line.trim());
+        if (match != null) {
+          final dir = match.group(1)!.replaceFirst(r'$HOME', home);
+          // A value of $HOME alone means the folder is disabled
+          return p.equals(dir, home) ? null : dir;
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  @override
+  Future<String> getDefaultPicturesFolder() async {
+    final folders = await getDefaultImageFolders();
+    if (folders.isNotEmpty) return folders.last;
 
     // Fallback to application documents directory
     final appDir = await getApplicationDocumentsDirectory();

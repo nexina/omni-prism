@@ -9,6 +9,9 @@ class ImageItem {
   /// Formatted creation/modification time
   String creationTime;
 
+  /// Last modified time, used to group by date (optional)
+  DateTime? modified;
+
   /// File size in bytes (optional)
   int? size;
 
@@ -17,6 +20,7 @@ class ImageItem {
     this.path = '',
     this.title = '',
     this.creationTime = '',
+    this.modified,
     this.size,
   });
 
@@ -30,6 +34,7 @@ class ImageItem {
       path: filePath,
       title: fileName,
       creationTime: formattedTime,
+      modified: modified,
       size: size,
     );
   }
@@ -39,12 +44,14 @@ class ImageItem {
     String? path,
     String? title,
     String? creationTime,
+    DateTime? modified,
     int? size,
   }) {
     return ImageItem(
       path: path ?? this.path,
       title: title ?? this.title,
       creationTime: creationTime ?? this.creationTime,
+      modified: modified ?? this.modified,
       size: size ?? this.size,
     );
   }

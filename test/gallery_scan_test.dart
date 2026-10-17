@@ -16,6 +16,7 @@ void main() {
   late Directory root;
   late SharedPreferences preferences;
   late GalleryLocalDataSourceImpl dataSource;
+  var defaultFolders = <String>[];
 
   void touch(String relative) {
     final file = File(p.join(root.path, relative));
@@ -24,10 +25,14 @@ void main() {
   }
 
   setUp(() async {
+    defaultFolders = [];
     SharedPreferences.setMockInitialValues({});
     preferences = await SharedPreferences.getInstance();
-    dataSource = GalleryLocalDataSourceImpl(preferences: preferences);
     root = Directory.systemTemp.createTempSync('omni_prism_scan');
+    dataSource = GalleryLocalDataSourceImpl(
+      preferences: preferences,
+      defaultImageFolders: () async => defaultFolders,
+    );
     touch('b.png');
     touch('a.jpg');
     touch('notes.txt');
@@ -76,6 +81,29 @@ void main() {
     return bloc.stream
         .firstWhere((s) => s.status != GalleryStatus.loading && !s.isLoading);
   }
+
+  test('first launch adds the platform image folders', () async {
+    final trip = p.join(root.path, 'trip');
+    defaultFolders = [trip];
+
+    final bloc = createBloc()..add(const LoadGallery());
+    final state = await settled(bloc);
+    expect(state.folders, [trip]);
+    expect(state.imageCount, 2);
+    expect(preferences.getStringList('gallery_folders'), [trip]);
+    await bloc.close();
+  });
+
+  test('removed default folders stay removed', () async {
+    defaultFolders = [root.path];
+    await preferences.setStringList('gallery_folders', []);
+
+    final bloc = createBloc()..add(const LoadGallery());
+    final state = await settled(bloc);
+    expect(state.status, GalleryStatus.empty);
+    expect(state.hasFolders, isFalse);
+    await bloc.close();
+  });
 
   test('with no folders added nothing is scanned', () async {
     final bloc = createBloc()..add(const LoadGallery());
@@ -136,6 +164,40 @@ void main() {
     // Adding the parent replaces its added subfolders
     folders = await manage.addFolder(folders, root.path);
     expect(folders, [root.path]);
-    expect(manage.getFolders(), [root.path]);
+    expect(await manage.getFolders(), [root.path]);
+  });
+
+  test('scanAll scans every folder, running them in parallel', () async {
+    final scan = ScanGalleryImagesUseCase(
+      GalleryRepositoryImpl(localDataSource: dataSource),
+    );
+    touch('other/x.png');
+    touch('other/y.png');
+    final folders = [p.join(root.path, 'trip'), p.join(root.path, 'other')];
+
+    final batches = await scan.scanAll(folders, concurrency: 2).toList();
+    final names = batches.expand((b) => b).map((e) => p.basename(e.path));
+    expect(names.toSet(), {'c.png', 'd.webp', 'x.png', 'y.png'});
+  });
+
+  test('the bloc shows a page of images and more on request', () async {
+    for (var i = 0; i < GalleryState.pageSize + 5; i++) {
+      touch('many/$i.png');
+    }
+    final bloc = createBloc()
+      ..add(LoadGallery(folders: [p.join(root.path, 'many')]));
+    var state = await settled(bloc);
+    int shown(GalleryState s) =>
+        s.sections.fold(0, (n, section) => n + section.images.length);
+
+    expect(state.imageCount, GalleryState.pageSize + 5);
+    expect(shown(state), GalleryState.pageSize);
+    expect(state.hasMore, isTrue);
+
+    bloc.add(const LoadMoreImages());
+    state = await bloc.stream.first;
+    expect(shown(state), GalleryState.pageSize + 5);
+    expect(state.hasMore, isFalse);
+    await bloc.close();
   });
 }

@@ -1,4 +1,5 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:omni_prism/features/gallery/domain/entities/gallery_section.dart';
 import 'package:omni_prism/features/gallery/domain/usecases/manage_gallery_folders.dart';
 import 'package:omni_prism/features/gallery/domain/usecases/pick_custom_folder.dart';
 import 'package:omni_prism/features/gallery/domain/usecases/scan_gallery_images.dart';
@@ -27,32 +28,38 @@ class GalleryBloc extends Bloc<GalleryEvent, GalleryState> {
     on<PickCustomFolder>(_onPickCustomFolder);
     on<RemoveFolder>(_onRemoveFolder);
     on<SelectImage>(_onSelectImage);
+    on<ChangeGrouping>(_onChangeGrouping);
+    on<LoadMoreImages>(_onLoadMoreImages);
     on<RefreshGallery>(_onRefreshGallery);
     on<PruneMissingImages>(_onPruneMissingImages);
   }
 
-  /// Scans the added folders in the background, adding images to the
-  /// gallery as each batch arrives. Does nothing until a folder is added.
+  /// Scans the added folders in parallel in the background, adding images
+  /// to the gallery as each batch arrives. Does nothing until a folder is added.
   Future<void> _onLoadGallery(
       LoadGallery event, Emitter<GalleryState> emit) async {
-    final folders = event.folders ?? _manageFolders.getFolders();
+    final folders = event.folders ?? await _manageFolders.getFolders();
 
     if (folders.isEmpty) {
-      emit(const GalleryState(status: GalleryStatus.empty));
+      emit(GalleryState(
+        status: GalleryStatus.empty,
+        grouping: state.grouping,
+      ));
       return;
     }
 
     emit(GalleryState(
       status: GalleryStatus.loading,
       folders: folders,
+      grouping: state.grouping,
       isLoading: true,
     ));
 
     await emit.forEach<List<ImageItem>>(
-      _scanFolders(folders),
-      onData: (batch) => state.copyWith(
-        status: GalleryStatus.loaded,
-        images: [...state.images, ...batch],
+      _scanGalleryImages.scanAll(folders),
+      onData: (batch) => _withImages(
+        state.copyWith(status: GalleryStatus.loaded),
+        [...state.images, ...batch],
       ),
       onError: (error, stackTrace) => state.copyWith(
         status: state.hasImages ? GalleryStatus.loaded : GalleryStatus.error,
@@ -69,13 +76,6 @@ class GalleryBloc extends Bloc<GalleryEvent, GalleryState> {
               : GalleryStatus.empty),
       isLoading: false,
     ));
-  }
-
-  /// Scans folders one after another
-  Stream<List<ImageItem>> _scanFolders(List<String> folders) async* {
-    for (final folder in folders) {
-      yield* _scanGalleryImages(folder);
-    }
   }
 
   /// Picks a folder, saves it and rescans
@@ -104,9 +104,7 @@ class GalleryBloc extends Bloc<GalleryEvent, GalleryState> {
   /// Selects an image, opens the viewer and drops deleted images on return
   Future<void> _onSelectImage(
       SelectImage event, Emitter<GalleryState> emit) async {
-    if (event.index < 0 || event.index >= state.images.length) return;
-
-    final selectedImage = state.images[event.index];
+    final selectedImage = event.image;
     final workingFile = WorkingFile(
       path: selectedImage.path,
       workingPath: selectedImage.path,
@@ -115,6 +113,44 @@ class GalleryBloc extends Bloc<GalleryEvent, GalleryState> {
 
     await AppRouter.navigateToImageViewer(workingFile);
     if (!isClosed) add(const PruneMissingImages());
+  }
+
+  /// Regroups the images
+  void _onChangeGrouping(ChangeGrouping event, Emitter<GalleryState> emit) {
+    if (event.grouping == state.grouping) return;
+    emit(_withImages(
+      state.copyWith(
+        grouping: event.grouping,
+        visibleCount: GalleryState.pageSize,
+      ),
+      state.images,
+    ));
+  }
+
+  /// Shows the next page of images
+  void _onLoadMoreImages(LoadMoreImages event, Emitter<GalleryState> emit) {
+    if (!state.hasMore) return;
+    emit(_withImages(
+      state.copyWith(
+        visibleCount: state.visibleCount + GalleryState.pageSize,
+      ),
+      state.images,
+    ));
+  }
+
+  /// [state] with [images] and their sections
+  GalleryState _withImages(GalleryState state, List<ImageItem> images) {
+    return state.copyWith(
+      images: images,
+      sections: GallerySection.take(
+        GallerySection.group(
+          images,
+          state.grouping,
+          rootFolders: state.folders,
+        ),
+        state.visibleCount,
+      ),
+    );
   }
 
   /// Rescans the added folders
@@ -135,11 +171,13 @@ class GalleryBloc extends Bloc<GalleryEvent, GalleryState> {
 
     final images =
         state.images.where((e) => !missing.contains(e.path)).toList();
-    emit(state.copyWith(
-      status: images.isEmpty && !state.isLoading
-          ? GalleryStatus.empty
-          : state.status,
-      images: images,
+    emit(_withImages(
+      state.copyWith(
+        status: images.isEmpty && !state.isLoading
+            ? GalleryStatus.empty
+            : state.status,
+      ),
+      images,
     ));
   }
 }

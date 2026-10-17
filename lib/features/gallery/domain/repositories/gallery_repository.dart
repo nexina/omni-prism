@@ -5,6 +5,9 @@ abstract class GalleryRepository {
   /// Gets the default Pictures folder path for the current platform
   Future<String> getDefaultPicturesFolder();
 
+  /// The platform's usual image folders that exist
+  Future<List<String>> getDefaultImageFolders();
+
   /// Gets all images in a folder
   Future<List<ImageItem>> getImagesInFolder(String folderPath);
 
@@ -17,8 +20,8 @@ abstract class GalleryRepository {
   /// Picks a custom folder using platform file picker
   Future<String?> pickCustomFolder();
 
-  /// Folders the user added to the gallery
-  List<String> getSavedFolders();
+  /// Folders the user added to the gallery, or null if never saved
+  List<String>? getSavedFolders();
 
   /// Persists the folders the user added to the gallery
   Future<void> saveFolders(List<String> folders);

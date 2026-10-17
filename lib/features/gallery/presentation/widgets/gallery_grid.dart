@@ -1,29 +1,90 @@
 import 'package:flutter/material.dart';
 import 'package:omni_prism/core/config/constants.dart';
+import 'package:omni_prism/core/utils/format_utils.dart';
 import 'package:omni_prism/core/widgets/file_image.dart';
+import 'package:omni_prism/features/gallery/domain/entities/gallery_section.dart';
 import 'package:omni_prism/features/image_viewer/data/models/image_item.dart';
 
 /// Callback for when a gallery image is tapped
-typedef OnImageTap = void Function(int index);
+typedef OnImageTap = void Function(ImageItem image);
 
-/// A responsive grid of gallery thumbnails
-class GalleryGrid extends StatelessWidget {
-  final List<ImageItem> images;
+/// A responsive grid of gallery thumbnails, split into titled sections.
+///
+/// Shows one page at a time: [onLoadMore] is called when the user scrolls
+/// near the end (or the page doesn't fill the view) while [hasMore].
+class GalleryGrid extends StatefulWidget {
+  final List<GallerySection> sections;
   final OnImageTap onImageTap;
+  final bool hasMore;
+  final VoidCallback? onLoadMore;
   final double maxTileExtent;
   final double spacing;
 
   const GalleryGrid({
     super.key,
-    required this.images,
+    required this.sections,
     required this.onImageTap,
+    this.hasMore = false,
+    this.onLoadMore,
     this.maxTileExtent = 180,
     this.spacing = 10.0,
   });
 
   @override
+  State<GalleryGrid> createState() => _GalleryGridState();
+}
+
+class _GalleryGridState extends State<GalleryGrid> {
+  final _scrollController = ScrollController();
+
+  /// Set once a page is requested, cleared when the next one arrives
+  bool _loadRequested = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_maybeLoadMore);
+    _checkAfterLayout();
+  }
+
+  @override
+  void didUpdateWidget(GalleryGrid oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.sections != oldWidget.sections) _loadRequested = false;
+    _checkAfterLayout();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  /// A page may not fill a large window, leaving nothing to scroll
+  void _checkAfterLayout() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _maybeLoadMore();
+    });
+  }
+
+  void _maybeLoadMore() {
+    if (_loadRequested || !widget.hasMore || !_scrollController.hasClients) {
+      return;
+    }
+    final position = _scrollController.position;
+    if (position.extentAfter < widget.maxTileExtent * 2) {
+      _loadRequested = true;
+      widget.onLoadMore?.call();
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (images.isEmpty) {
+    final sections = widget.sections;
+    final maxTileExtent = widget.maxTileExtent;
+    final spacing = widget.spacing;
+    final onImageTap = widget.onImageTap;
+    if (sections.isEmpty) {
       return const SizedBox.shrink();
     }
 
@@ -38,21 +99,94 @@ class GalleryGrid extends StatelessWidget {
           trackBorderColor: WidgetStateProperty.all(Colors.transparent),
         ),
       ),
-      child: GridView.builder(
-        padding: EdgeInsets.all(spacing),
-        gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-          maxCrossAxisExtent: maxTileExtent,
-          crossAxisSpacing: spacing,
-          mainAxisSpacing: spacing,
-        ),
-        itemCount: images.length,
-        itemBuilder: (context, index) {
-          return _GalleryGridItem(
-            imageItem: images[index],
-            cacheWidth: cacheWidth,
-            onTap: () => onImageTap(index),
-          );
-        },
+      child: CustomScrollView(
+        controller: _scrollController,
+        slivers: [
+          for (final section in sections) ...[
+            SliverToBoxAdapter(
+              child: _GallerySectionHeader(
+                section: section,
+                padding: EdgeInsets.fromLTRB(spacing + 2, spacing + 6, spacing, 2),
+              ),
+            ),
+            SliverPadding(
+              padding: EdgeInsets.all(spacing),
+              sliver: SliverGrid.builder(
+                gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+                  maxCrossAxisExtent: maxTileExtent,
+                  crossAxisSpacing: spacing,
+                  mainAxisSpacing: spacing,
+                ),
+                itemCount: section.images.length,
+                itemBuilder: (context, index) {
+                  final image = section.images[index];
+                  return _GalleryGridItem(
+                    imageItem: image,
+                    cacheWidth: cacheWidth,
+                    onTap: () => onImageTap(image),
+                  );
+                },
+              ),
+            ),
+          ],
+          if (widget.hasMore)
+            const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.all(16),
+                child: Center(
+                  child: SizedBox.square(
+                    dimension: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white70,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Section title with its image count
+class _GallerySectionHeader extends StatelessWidget {
+  final GallerySection section;
+  final EdgeInsets padding;
+
+  const _GallerySectionHeader({required this.section, required this.padding});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: padding,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.baseline,
+        textBaseline: TextBaseline.alphabetic,
+        children: [
+          Flexible(
+            child: Text(
+              section.title,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                fontFamily: AppConstants.fontFamily,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            FormatUtils.formatNumber(section.totalCount),
+            style: const TextStyle(
+              color: Colors.white54,
+              fontSize: 13,
+              fontFamily: AppConstants.fontFamily,
+            ),
+          ),
+        ],
       ),
     );
   }
